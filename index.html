@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Image Annotation Tool</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f2f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .upload-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .form-group input[type="text"],
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+
+        .priority-low {
+            color: green;
+        }
+
+        .priority-medium {
+            color: orange;
+        }
+
+        .priority-high {
+            color: red;
+        }
+
+        #imageContainer {
+            position: relative;
+            min-height: 400px;
+            border: 2px dashed #ccc;
+            margin: 20px 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #f8f9fa;
+            overflow: hidden;
+        }
+
+        #annotationImage {
+            max-width: 100%;
+            max-height: 600px;
+            display: none;
+            pointer-events: none;
+        }
+
+        .annotation-marker {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 0, 0.5);
+            border: 3px solid red;
+            cursor: pointer;
+            transform: translate(-50%, -50%);
+            z-index: 100;
+        }
+
+        .annotation-tooltip {
+            position: absolute;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            z-index: 1000;
+            min-width: 200px;
+        }
+
+        button {
+            margin: 0 5px;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        #annotationsList {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .annotation-item {
+            padding: 10px;
+            margin-bottom: 10px;
+            background: white;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .tooltip-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        /* Loading state styles */
+        button.loading {
+            position: relative;
+            padding-right: 30px;
+        }
+
+        button.loading::after {
+            content: "";
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 12px;
+            height: 12px;
+            border: 2px solid #ffffff;
+            border-top: 2px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: translateY(-50%) rotate(0deg); }
+            100% { transform: translateY(-50%) rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Image Annotation Tool</h1>
+        </div>
+        
+        <div class="upload-section">
+            <div class="form-group">
+                <label for="imageUpload">Upload Image:</label>
+                <input type="file" id="imageUpload" accept="image/*">
+            </div>
+            
+            <div class="form-group">
+                <label for="imageDescription">Image Description:</label>
+                <textarea id="imageDescription" rows="3" placeholder="Enter image description..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="priority">Priority:</label>
+                <select id="priority">
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="assignedTo">Assigned To:</label>
+                <input type="text" id="assignedTo" placeholder="Enter assignee name">
+            </div>
+
+            <button id="saveButton" disabled>Save Annotations</button>
+            <button id="showAnnotationsButton" disabled>Show Annotations</button>
+            <button id="clearButton" disabled>Clear All</button>
+        </div>
+
+        <div id="imageContainer">
+            <img id="annotationImage" alt="Upload an image to annotate">
+        </div>
+
+        <div id="annotationsList" style="display: none;">
+            <h3>Annotations List</h3>
+        </div>
+    </div>
+    <script src="image_upload.js"></script>
+    <script>
+        const imageUpload = document.getElementById('imageUpload');
+        const imageDescription = document.getElementById('imageDescription');
+        const priority = document.getElementById('priority');
+        const assignedTo = document.getElementById('assignedTo');
+        const imageContainer = document.getElementById('imageContainer');
+        const annotationImage = document.getElementById('annotationImage');
+        const saveButton = document.getElementById('saveButton');
+        const showAnnotationsButton = document.getElementById('showAnnotationsButton');
+        const clearButton = document.getElementById('clearButton');
+        const annotationsList = document.getElementById('annotationsList');
+
+        let annotations = [];
+        let currentTooltip = null;
+
+        imageUpload.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file && file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    annotationImage.src = event.target.result;
+                    annotationImage.style.display = 'block';
+                    enableButtons();
+                    annotations = [];
+                    updateAnnotationsList();
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        function enableButtons() {
+            saveButton.disabled = false;
+            showAnnotationsButton.disabled = false;
+            clearButton.disabled = false;
+        }
+
+        imageContainer.addEventListener('click', function(e) {
+            if (e.target === imageContainer || e.target === annotationImage) {
+                const rect = imageContainer.getBoundingClientRect();
+                const x = e.pageX - rect.left - window.pageXOffset;
+                const y = e.pageY - rect.top - window.pageYOffset;
+
+                const imageRect = annotationImage.getBoundingClientRect();
+                if (x >= (imageRect.left - rect.left) && x <= (imageRect.right - rect.left) && 
+                    y >= (imageRect.top - rect.top) && y <= (imageRect.bottom - rect.top)) {
+                    createAnnotation(x, y);
+                }
+            }
+        });
+
+        function createAnnotation(x, y, description = '') {
+            const marker = document.createElement('div');
+            marker.className = 'annotation-marker';
+            marker.style.left = x + 'px';
+            marker.style.top = y + 'px';
+            marker.dataset.x = x;
+            marker.dataset.y = y;
+
+            const tooltip = createTooltip(x, y, description);
+            marker.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (currentTooltip) {
+                    currentTooltip.remove();
+                }
+                imageContainer.appendChild(tooltip);
+                currentTooltip = tooltip;
+            });
+
+            imageContainer.appendChild(marker);
+            return marker;
+        }
+
+        function createTooltip(x, y, existingDescription = '') {
+            const tooltip = document.createElement('div');
+            tooltip.className = 'annotation-tooltip';
+            tooltip.style.left = (x + 45) + 'px';
+            tooltip.style.top = y + 'px';
+
+            const textarea = document.createElement('textarea');
+            textarea.placeholder = 'Enter annotation description...';
+            textarea.value = existingDescription;
+            
+            const saveBtn = document.createElement('button');
+            saveBtn.textContent = 'Save';
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = 'Cancel';
+            cancelBtn.style.backgroundColor = '#dc3545';
+
+            const buttonContainer = document.createElement('div');
+            buttonContainer.className = 'tooltip-buttons';
+            buttonContainer.appendChild(saveBtn);
+            buttonContainer.appendChild(cancelBtn);
+
+            tooltip.appendChild(textarea);
+            tooltip.appendChild(buttonContainer);
+
+            saveBtn.addEventListener('click', () => {
+                const description = textarea.value.trim();
+                if (description) {
+                    annotations.push({
+                        x: x,
+                        y: y,
+                        description: description,
+                        timestamp: new Date().toISOString(),
+                        priority: priority.value,
+                        assignedTo: assignedTo.value
+                    });
+                    tooltip.remove();
+                    currentTooltip = null;
+                    updateAnnotationsList();
+                }
+            });
+
+            cancelBtn.addEventListener('click', () => {
+                tooltip.remove();
+                currentTooltip = null;
+            });
+
+            return tooltip;
+        }
+
+        function updateAnnotationsList() {
+            annotationsList.innerHTML = '<h3>Annotations List</h3>';
+            annotations.forEach((annotation, index) => {
+                const item = document.createElement('div');
+                item.className = 'annotation-item';
+
+                const description = document.createElement('p');
+                description.textContent = `Description: ${annotation.description}`;
+                item.appendChild(description);
+
+                const position = document.createElement('p');
+                position.textContent = `Position: (${Math.round(annotation.x)}, ${Math.round(annotation.y)})`;
+                item.appendChild(position);
+
+                const timestamp = document.createElement('p');
+                timestamp.textContent = `Timestamp: ${new Date(annotation.timestamp).toLocaleString()}`;
+                item.appendChild(timestamp);
+
+                annotationsList.appendChild(item);
+            });
+        }
+
+        showAnnotationsButton.addEventListener('click', () => {
+            annotationsList.style.display = annotationsList.style.display === 'none' ? 'block' : 'none';
+        });
+
+        clearButton.addEventListener('click', () => {
+            if (confirm('Are you sure you want to clear all annotations?')) {
+                annotations = [];
+                updateAnnotationsList();
+                const markers = imageContainer.querySelectorAll('.annotation-marker');
+                markers.forEach(marker => marker.remove());
+                if (currentTooltip) {
+                    currentTooltip.remove();
+                    currentTooltip = null;
+                }
+            }
+        });
+    </script>
+</body>
+</html>
